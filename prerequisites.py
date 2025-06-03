@@ -123,3 +123,51 @@ else:
     print("\n표본 크기가 너무 작아 LOF를 적용하지 않음")
     df_filtered = df.copy()
     df['is_outlier'] = False
+
+    # 9. 기술 통계 계산
+statistics = []
+
+for course_a, course_b, rec_col in course_pairs:
+    pair_key = f"{course_a}_{course_b}"
+    took_col = f"took_{pair_key}_first"
+    rec_pair_col = f"recommend_{pair_key}"
+    
+    # 필요한 데이터가 있는 행만 필터링
+    pair_data = order_df[[took_col, rec_pair_col]].dropna()
+    
+    if len(pair_data) > 0:
+        # 기술 통계
+        recommend_pct = pair_data[rec_pair_col].mean() * 100
+        took_first_pct = pair_data[took_col].mean() * 100
+        
+        # 교차표 작성
+        if len(pair_data) > 1:  # 최소 2개 이상의 데이터가 필요
+            try:
+                cross_tab = pd.crosstab(pair_data[took_col], pair_data[rec_pair_col])
+                
+                # 카이제곱 검정 (기대 빈도가 5 미만인 셀이 있으면 Fisher's exact test 고려)
+                chi2, p_value, dof, expected = chi2_contingency(cross_tab)
+                
+                # 결과 저장
+                statistics.append({
+                    'Course A': course_a,
+                    'Course B': course_b,
+                    'Recommend %': round(recommend_pct, 1),
+                    'Took A First %': round(took_first_pct, 1),
+                    'Sample Size': len(pair_data),
+                    'Chi-Square': round(chi2, 2),
+                    'p-value': round(p_value, 3),
+                    'Significant': 'Yes' if p_value < 0.05 else 'No'
+                })
+            except:
+                # 교차표에 0행/0열이 있는 경우 오류 처리
+                statistics.append({
+                    'Course A': course_a,
+                    'Course B': course_b,
+                    'Recommend %': round(recommend_pct, 1),
+                    'Took A First %': round(took_first_pct, 1),
+                    'Sample Size': len(pair_data),
+                    'Chi-Square': None,
+                    'p-value': None,
+                    'Significant': 'N/A'
+                })
