@@ -31,8 +31,8 @@ prereq_columns = [
 ]
 
 for col in prereq_columns:
-    df[col] = df[col].map({'예': 1, '아니오': 0})
-    # '모름' 응답은 NaN으로 처리
+    df[col] = df[col].map({'예': 1, '아니오': 0, '모름': np.nan})
+    # '모름' 응답은 NaN으로 처리하여 분석에서 제외
 
 # 4. 데이터 결측치 확인
 missing_values = df[prereq_columns].isnull().sum()
@@ -69,7 +69,7 @@ course_pairs = [
 # 7. 실제 이수 순서 변수 생성
 student_courses = []
 
-for idx, row in df.iterrows():
+for idx, row in df_filtered.iterrows():  # 이상치 제거된 데이터 사용
     courses_by_semester = extract_courses(row, semester_cols)
     student_info = {'student_id': idx}
     
@@ -88,7 +88,7 @@ for idx, row in df.iterrows():
             student_info[f"sem_{course_b}"] = sem_b
             student_info[f"took_{pair_key}_first"] = took_a_first
             
-            # 추천 여부도 함께 저장
+            # 추천 여부도 함께 저장 (모름 응답은 NaN으로 유지)
             student_info[f"recommend_{pair_key}"] = row[rec_col]
     
     student_courses.append(student_info)
@@ -102,29 +102,39 @@ print(order_df.head(2))
 # 8. 이상치 탐지 (LOF 적용)
 # 추천 응답 패턴만 사용하여 이상치 식별
 if len(df) > 10:  # LOF는 최소 10개 이상의 샘플이 필요
-    lof_features = df[prereq_columns].fillna(0.5)  # 결측치는 중간값으로 처리
-    
-    # LOF 모델 학습
-    lof = LocalOutlierFactor(n_neighbors=5, contamination=0.1)
-    outlier_scores = lof.fit_predict(lof_features)
-    
-    # 이상치 점수 저장
-    df['outlier_score'] = outlier_scores
-    
-    # 이상치 식별 (-1은 이상치, 1은 정상)
-    df['is_outlier'] = df['outlier_score'] == -1
-    
-    print("\n이상치로 식별된 응답자 수:", df['is_outlier'].sum())
-    
-    # 이상치 제거한 데이터 준비
-    df_filtered = df[~df['is_outlier']]
-    print("이상치 제거 후 데이터 크기:", df_filtered.shape)
+    # 결측치(모름 응답)는 제외하고 예/아니오 응답만으로 이상치 탐지
+    # 결측치가 너무 많은 행은 제외
+    valid_rows = df[prereq_columns].dropna(thresh=len(prereq_columns)//2)
+    if len(valid_rows) > 10:
+        lof_features = valid_rows.copy()
+        
+        # 각 행별로 결측치를 해당 열의 평균으로 대체
+        for col in lof_features.columns:
+            lof_features[col].fillna(lof_features[col].mean(), inplace=True)
+        
+        # LOF 모델 학습
+        lof = LocalOutlierFactor(n_neighbors=5, contamination=0.1)
+        outlier_scores = lof.fit_predict(lof_features)
+        
+        # 원본 데이터프레임에 이상치 점수 매핑
+        df['is_outlier'] = False  # 기본값
+        df.loc[valid_rows.index, 'is_outlier'] = (outlier_scores == -1)
+        
+        print("\n이상치로 식별된 응답자 수:", df['is_outlier'].sum())
+        
+        # 이상치 제거한 데이터 준비
+        df_filtered = df[~df['is_outlier']]
+        print("이상치 제거 후 데이터 크기:", df_filtered.shape)
+    else:
+        print("\n유효한 응답이 충분하지 않아 LOF를 적용하지 않음")
+        df['is_outlier'] = False
+        df_filtered = df.copy()
 else:
     print("\n표본 크기가 너무 작아 LOF를 적용하지 않음")
-    df_filtered = df.copy()
     df['is_outlier'] = False
+    df_filtered = df.copy()
 
-    # 9. 기술 통계 계산
+# 9. 기술 통계 계산
 statistics = []
 
 for course_a, course_b, rec_col in course_pairs:
@@ -132,7 +142,7 @@ for course_a, course_b, rec_col in course_pairs:
     took_col = f"took_{pair_key}_first"
     rec_pair_col = f"recommend_{pair_key}"
     
-    # 필요한 데이터가 있는 행만 필터링
+    # 필요한 데이터가 있는 행만 필터링 (모름 응답은 제외)
     pair_data = order_df[[took_col, rec_pair_col]].dropna()
     
     if len(pair_data) > 0:
@@ -171,30 +181,64 @@ for course_a, course_b, rec_col in course_pairs:
                     'p-value': None,
                     'Significant': 'N/A'
                 })
+
 # 10. 결과 출력
 stats_df = pd.DataFrame(statistics)
 print("\n과목 쌍별 통계 분석 결과:")
 print(stats_df)
 
 # 11. 결과 시각화
-plt.figure(figsize=(12, 8))
+plt.figure(figsize=(14, 8))
 
 # 추천률과 실제 순서 일치율 비교
 x = range(len(stats_df))
 width = 0.35
 
-plt.bar([i - width/2 for i in x], stats_df['Recommend %'], width, label='추천 비율 (%)')
-plt.bar([i + width/2 for i in x], stats_df['Took A First %'], width, label='실제 순서 일치율 (%)')
+plt.bar([i - width/2 for i in x], stats_df['Recommend %'], width, label='추천 비율 (%)', color='skyblue')
+plt.bar([i + width/2 for i in x], stats_df['Took A First %'], width, label='실제 순서 일치율 (%)', color='salmon')
 
-plt.xlabel('과목 쌍')
-plt.ylabel('비율 (%)')
-plt.title('선수과목 추천 비율 vs 실제 수강 순서 일치율')
+plt.xlabel('과목 쌍', fontsize=12)
+plt.ylabel('비율 (%)', fontsize=12)
+plt.title('선수과목 추천 비율 vs 실제 수강 순서 일치율', fontsize=14)
 plt.xticks(x, [f"{row['Course A']}->{row['Course B']}" for _, row in stats_df.iterrows()], rotation=45, ha='right')
-plt.legend()
+plt.legend(fontsize=12)
 plt.tight_layout()
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 
+# 표본 크기 정보 추가
+for i, v in enumerate(stats_df['Sample Size']):
+    plt.text(i, 5, f"n={v}", ha='center', fontsize=9, color='dimgray')
+
+# 통계적 유의성 표시
+for i, row in enumerate(stats_df.itertuples()):
+    if row.Significant == 'Yes':
+        plt.text(i, 100, '*', fontsize=20, ha='center', color='red')
+
 plt.savefig('prereq_comparison.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+# 추가 시각화: 과목 쌍별 추천 비율과 실제 순서 상관관계
+plt.figure(figsize=(10, 8))
+plt.scatter(stats_df['Recommend %'], stats_df['Took A First %'], 
+           s=stats_df['Sample Size']*5, alpha=0.7, c='teal')
+
+# 과목 쌍 레이블 추가
+for i, row in stats_df.iterrows():
+    plt.annotate(f"{row['Course A']}->{row['Course B']}", 
+                xy=(row['Recommend %'], row['Took A First %']),
+                xytext=(5, 5), textcoords='offset points', fontsize=9)
+
+# 45도 선 추가 (완벽한 일치를 나타냄)
+max_val = max(stats_df['Recommend %'].max(), stats_df['Took A First %'].max())
+plt.plot([0, max_val], [0, max_val], 'r--', alpha=0.5)
+
+plt.xlabel('추천 비율 (%)', fontsize=12)
+plt.ylabel('실제 순서 일치율 (%)', fontsize=12)
+plt.title('선수과목 추천 비율과 실제 수강 순서 일치율의 관계', fontsize=14)
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.tight_layout()
+
+plt.savefig('prereq_correlation.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 # 12. 상세 교차표 분석 (유의미한 관계가 있는 경우)
@@ -203,7 +247,7 @@ for course_a, course_b, rec_col in course_pairs:
     took_col = f"took_{pair_key}_first"
     rec_pair_col = f"recommend_{pair_key}"
     
-    # 필요한 데이터가 있는 행만 필터링
+    # 필요한 데이터가 있는 행만 필터링 (모름 응답은 제외)
     pair_data = order_df[[took_col, rec_pair_col]].dropna()
     
     if len(pair_data) > 5:  # 최소한의 데이터가 있는 경우만
@@ -248,18 +292,44 @@ print("\n==== 종합 결론 ====")
 if len(significant_pairs) > 0:
     print(f"총 {len(significant_pairs)}개 과목 쌍에서 수강 순서와 추천 사이에 유의미한 관계가 발견되었습니다:")
     for _, row in significant_pairs.iterrows():
-        print(f"- {row['Course A']} -> {row['Course B']}")
+        print(f"- {row['Course A']} -> {row['Course B']} (p={row['p-value']}, χ²={row['Chi-Square']})")
     print("\n이러한 과목들은 실제 수강 경험이 선수과목 추천에 영향을 미치는 것으로 보입니다.")
 else:
     print("어떤 과목 쌍에서도 수강 순서와 추천 사이에 통계적으로 유의미한 관계가 발견되지 않았습니다.")
     print("이는 선수과목 추천이 실제 수강 경험보다는 다른 요인(예: 교육과정 구조, 과목 난이도 등)에 기반할 수 있음을 시사합니다.")
 
-print("\n추천 비율이 가장 높은 과목 쌍:")
-top_recommended = stats_df.sort_values('Recommend %', ascending=False).head(3)
-for _, row in top_recommended.iterrows():
-    print(f"- {row['Course A']} -> {row['Course B']}: {row['Recommend %']}%")
+print("\n추천 비율이 가장 높은 과목 쌍 (응답자의 50% 이상이 선수과목으로 추천):")
+top_recommended = stats_df[stats_df['Recommend %'] >= 50].sort_values('Recommend %', ascending=False)
+if len(top_recommended) > 0:
+    for _, row in top_recommended.iterrows():
+        print(f"- {row['Course A']} -> {row['Course B']}: {row['Recommend %']}% (n={row['Sample Size']})")
+else:
+    print("응답자의 50% 이상이 선수과목으로 추천한 과목 쌍이 없습니다.")
 
-print("\n실제 순서 일치율이 가장 높은 과목 쌍:")
-top_ordered = stats_df.sort_values('Took A First %', ascending=False).head(3)
-for _, row in top_ordered.iterrows():
-    print(f"- {row['Course A']} -> {row['Course B']}: {row['Took A First %']}%")
+print("\n실제 순서 일치율이 가장 높은 과목 쌍 (80% 이상의 학생이 선수과목 순서로 수강):")
+top_ordered = stats_df[stats_df['Took A First %'] >= 80].sort_values('Took A First %', ascending=False)
+if len(top_ordered) > 0:
+    for _, row in top_ordered.iterrows():
+        print(f"- {row['Course A']} -> {row['Course B']}: {row['Took A First %']}% (n={row['Sample Size']})")
+else:
+    print("80% 이상의 학생이 선수과목 순서로 수강한 과목 쌍이 없습니다.")
+
+print("\n추천 비율과 실제 순서 일치율 간의 차이가 큰 과목 쌍 (25%p 이상):")
+discrepancy = stats_df.copy()
+discrepancy['Difference'] = abs(discrepancy['Recommend %'] - discrepancy['Took A First %'])
+large_diff = discrepancy[discrepancy['Difference'] >= 25].sort_values('Difference', ascending=False)
+if len(large_diff) > 0:
+    for _, row in large_diff.iterrows():
+        print(f"- {row['Course A']} -> {row['Course B']}: 추천 {row['Recommend %']}% vs 실제 순서 {row['Took A First %']}% (차이: {row['Difference']:.1f}%p)")
+else:
+    print("추천 비율과 실제 순서 일치율 간의 차이가 25%p 이상인 과목 쌍이 없습니다.")
+
+# 전체적인 결론
+print("\n결론적으로, ", end="")
+if len(significant_pairs) > 0:
+    print(f"일부 과목 쌍({len(significant_pairs)}개)에서는 실제 수강 순서와 선수과목 추천 사이에 유의미한 관계가 있지만, ")
+    print(f"대부분의 과목 쌍({len(stats_df) - len(significant_pairs)}개)에서는 그런 관계가 발견되지 않았습니다.")
+    print("이는 선수과목 추천이 실제 수강 경험 외에도 다양한 요인에 영향을 받을 수 있음을 시사합니다.")
+else:
+    print("실제 수강 순서와 선수과목 추천 사이에 통계적으로 유의미한 관계가 발견되지 않았습니다.")
+    print("이는 학생들의 선수과목 추천이 개인적인 수강 경험보다 교과 내용의 논리적 연결성, 난이도 등 다른 요인에 더 영향을 받을 수 있음을 시사합니다.")
