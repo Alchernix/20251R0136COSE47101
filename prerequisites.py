@@ -240,3 +240,26 @@ for course_a, course_b, rec_col in course_pairs:
                 print(f"결론: {course_a}와 {course_b} 간의 수강 순서와 추천 사이에 유의미한 관계가 없습니다.")
         except:
             print(f"\n{course_a} -> {course_b}: 충분한 데이터가 없어 통계 분석이 불가능합니다.")
+
+# 13. 종합 결론
+significant_pairs = stats_df[stats_df['Significant'] == 'Yes']
+print("\n==== 종합 결론 ====")
+
+if len(significant_pairs) > 0:
+    print(f"총 {len(significant_pairs)}개 과목 쌍에서 수강 순서와 추천 사이에 유의미한 관계가 발견되었습니다:")
+    for _, row in significant_pairs.iterrows():
+        print(f"- {row['Course A']} -> {row['Course B']}")
+    print("\n이러한 과목들은 실제 수강 경험이 선수과목 추천에 영향을 미치는 것으로 보입니다.")
+else:
+    print("어떤 과목 쌍에서도 수강 순서와 추천 사이에 통계적으로 유의미한 관계가 발견되지 않았습니다.")
+    print("이는 선수과목 추천이 실제 수강 경험보다는 다른 요인(예: 교육과정 구조, 과목 난이도 등)에 기반할 수 있음을 시사합니다.")
+
+print("\n추천 비율이 가장 높은 과목 쌍:")
+top_recommended = stats_df.sort_values('Recommend %', ascending=False).head(3)
+for _, row in top_recommended.iterrows():
+    print(f"- {row['Course A']} -> {row['Course B']}: {row['Recommend %']}%")
+
+print("\n실제 순서 일치율이 가장 높은 과목 쌍:")
+top_ordered = stats_df.sort_values('Took A First %', ascending=False).head(3)
+for _, row in top_ordered.iterrows():
+    print(f"- {row['Course A']} -> {row['Course B']}: {row['Took A First %']}%")
