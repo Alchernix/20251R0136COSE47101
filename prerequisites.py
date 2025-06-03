@@ -171,3 +171,28 @@ for course_a, course_b, rec_col in course_pairs:
                     'p-value': None,
                     'Significant': 'N/A'
                 })
+# 10. 결과 출력
+stats_df = pd.DataFrame(statistics)
+print("\n과목 쌍별 통계 분석 결과:")
+print(stats_df)
+
+# 11. 결과 시각화
+plt.figure(figsize=(12, 8))
+
+# 추천률과 실제 순서 일치율 비교
+x = range(len(stats_df))
+width = 0.35
+
+plt.bar([i - width/2 for i in x], stats_df['Recommend %'], width, label='추천 비율 (%)')
+plt.bar([i + width/2 for i in x], stats_df['Took A First %'], width, label='실제 순서 일치율 (%)')
+
+plt.xlabel('과목 쌍')
+plt.ylabel('비율 (%)')
+plt.title('선수과목 추천 비율 vs 실제 수강 순서 일치율')
+plt.xticks(x, [f"{row['Course A']}->{row['Course B']}" for _, row in stats_df.iterrows()], rotation=45, ha='right')
+plt.legend()
+plt.tight_layout()
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+plt.savefig('prereq_comparison.png', dpi=300, bbox_inches='tight')
+plt.show()
