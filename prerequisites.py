@@ -196,3 +196,47 @@ plt.grid(axis='y', linestyle='--', alpha=0.7)
 
 plt.savefig('prereq_comparison.png', dpi=300, bbox_inches='tight')
 plt.show()
+
+# 12. 상세 교차표 분석 (유의미한 관계가 있는 경우)
+for course_a, course_b, rec_col in course_pairs:
+    pair_key = f"{course_a}_{course_b}"
+    took_col = f"took_{pair_key}_first"
+    rec_pair_col = f"recommend_{pair_key}"
+    
+    # 필요한 데이터가 있는 행만 필터링
+    pair_data = order_df[[took_col, rec_pair_col]].dropna()
+    
+    if len(pair_data) > 5:  # 최소한의 데이터가 있는 경우만
+        cross_tab = pd.crosstab(
+            pair_data[took_col], 
+            pair_data[rec_pair_col],
+            rownames=['실제 순서 (1=A먼저)'],
+            colnames=['추천 (1=추천함)']
+        )
+        
+        # 상대 빈도 계산
+        cross_tab_pct = pd.crosstab(
+            pair_data[took_col], 
+            pair_data[rec_pair_col], 
+            normalize='index'
+        ) * 100
+        
+        # 카이제곱 검정
+        try:
+            chi2, p_value, dof, expected = chi2_contingency(cross_tab)
+            
+            print(f"\n{course_a} -> {course_b} 관계 분석:")
+            print(f"표본 크기: {len(pair_data)}")
+            print(f"카이제곱: {chi2:.2f}, p-value: {p_value:.3f}")
+            print("\n교차표 (빈도):")
+            print(cross_tab)
+            print("\n교차표 (행 기준 %):")
+            print(cross_tab_pct.round(1))
+            
+            # p-value가 0.05 미만인 경우 유의미한 관계로 간주
+            if p_value < 0.05:
+                print(f"결론: {course_a}와 {course_b} 간의 수강 순서와 추천 사이에 유의미한 관계가 있습니다.")
+            else:
+                print(f"결론: {course_a}와 {course_b} 간의 수강 순서와 추천 사이에 유의미한 관계가 없습니다.")
+        except:
+            print(f"\n{course_a} -> {course_b}: 충분한 데이터가 없어 통계 분석이 불가능합니다.")
