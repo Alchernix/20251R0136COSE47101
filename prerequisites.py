@@ -98,3 +98,28 @@ order_df = pd.DataFrame(student_courses)
 print("\n이수 순서 데이터프레임 크기:", order_df.shape)
 print("\n이수 순서 데이터프레임 샘플:")
 print(order_df.head(2))
+
+# 8. 이상치 탐지 (LOF 적용)
+# 추천 응답 패턴만 사용하여 이상치 식별
+if len(df) > 10:  # LOF는 최소 10개 이상의 샘플이 필요
+    lof_features = df[prereq_columns].fillna(0.5)  # 결측치는 중간값으로 처리
+    
+    # LOF 모델 학습
+    lof = LocalOutlierFactor(n_neighbors=5, contamination=0.1)
+    outlier_scores = lof.fit_predict(lof_features)
+    
+    # 이상치 점수 저장
+    df['outlier_score'] = outlier_scores
+    
+    # 이상치 식별 (-1은 이상치, 1은 정상)
+    df['is_outlier'] = df['outlier_score'] == -1
+    
+    print("\n이상치로 식별된 응답자 수:", df['is_outlier'].sum())
+    
+    # 이상치 제거한 데이터 준비
+    df_filtered = df[~df['is_outlier']]
+    print("이상치 제거 후 데이터 크기:", df_filtered.shape)
+else:
+    print("\n표본 크기가 너무 작아 LOF를 적용하지 않음")
+    df_filtered = df.copy()
+    df['is_outlier'] = False
