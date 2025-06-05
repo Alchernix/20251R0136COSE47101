@@ -1,4 +1,5 @@
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 
 # 데이터 파일 읽기
 df = pd.read_excel('data.xlsx', skiprows=1, header=None, usecols='C:J', engine='openpyxl')
@@ -49,8 +50,21 @@ for row in user_df.itertuples(index=False):
 user_vector = [1 if subject in subjects_taken else 0 for subject in all_subjects]
 
 user_vector_df = pd.DataFrame([user_vector], columns=all_subjects)
+
+# # 확인
+# print(user_vector_df.head())
+# user_vector_df.to_excel('user_vector.xlsx', index=False, engine='openpyxl')
 # ===================================================================
+# 코사인 유사도 계산
+similarities = cosine_similarity(user_vector_df, vector_df)[0]
+
+similarity_df = pd.DataFrame({
+    'user_index': vector_df.index,
+    'similarity': similarities
+})
+
+# 유사도 높은 순 정렬
+similarity_df = similarity_df.sort_values(by='similarity', ascending=False)
+
 # 확인
-#print(user_df.head())
-print(user_vector_df.head())
-user_vector_df.to_excel('user_vector.xlsx', index=False, engine='openpyxl')
+print(similarity_df.head(5).to_string(index=False))
