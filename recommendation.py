@@ -63,8 +63,29 @@ similarity_df = pd.DataFrame({
     'similarity': similarities
 })
 
-# 유사도 높은 순 정렬
 similarity_df = similarity_df.sort_values(by='similarity', ascending=False)
+# ===================================================================
+# 나와 유사한 n명이 들은 과목 추천
+# 유사도 threshold = 0.6
+top_users = similarity_df[similarity_df['similarity'] >= 0.6]
+top_users_vectors = vector_df.iloc[top_users['user_index']]
 
-# 확인
-print(similarity_df.head(5).to_string(index=False))
+# 내가 아직 안 들은 과목 (user_vector에서 0인 과목 인덱스)
+user_vector = user_vector_df.iloc[0].values  # Series → numpy array
+not_taken_indices = [i for i, val in enumerate(user_vector) if val == 0]
+not_taken_subjects = [all_subjects[i] for i in not_taken_indices]
+
+# 누가 어떤 과목을 들었는지 count
+recommend_counts = {}
+
+for subject in not_taken_subjects:
+    count = top_users_vectors[subject].sum()
+    if count > 0:
+        recommend_counts[subject] = count
+
+# 추천 과목 정렬 (많이 들은 순)
+sorted_recommendations = sorted(recommend_counts.items(), key=lambda x: x[1], reverse=True)
+
+print("추천 과목:\n")
+for subject, count in sorted_recommendations:
+    print(f"{subject}: {count}명 수강")
