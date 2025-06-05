@@ -1,11 +1,9 @@
 import pandas as pd
 
-# 엑셀 파일 경로 (파일명.xlsx 부분을 실제 파일명으로 바꾸세요)
-file_path = 'data.xlsx'
-
-# C~J 열만 읽기
-df = pd.read_excel(file_path, skiprows=1, header=None, usecols='C:J', engine='openpyxl')
-
+# 데이터 파일 읽기
+df = pd.read_excel('data.xlsx', skiprows=1, header=None, usecols='C:J', engine='openpyxl')
+# 유저 파일 읽기 - 나중에 방식 수정 예정
+user_df = pd.read_excel('user_data.xlsx', header=None, engine='openpyxl')
 # ===================================================================
 # 전체 과목 목록 추출+정렬
 subject_set = set()
@@ -17,11 +15,11 @@ for row in df.itertuples(index=False):
             subject_set.update(subjects)
 
 all_subjects = sorted(subject_set)
-for subject in all_subjects:
-    print(subject)
+# for subject in all_subjects:
+#     print(subject)
 
 # ===================================================================
-# 3. 사용자별 수강 과목 벡터 만들기
+# 사용자별 수강 과목 벡터 생성
 user_vectors = []
 
 for row in df.itertuples(index=False):
@@ -36,9 +34,23 @@ for row in df.itertuples(index=False):
     vector = [1 if subject in subjects_taken else 0 for subject in all_subjects]
     user_vectors.append(vector)
 
-# 4. 결과를 DataFrame으로 변환
 vector_df = pd.DataFrame(user_vectors, columns=all_subjects)
+# ===================================================================
+# 추천받을 사용자의 수강 과목 벡터 생성
+subjects_taken = set()
 
+for row in user_df.itertuples(index=False):
+    for cell in row:
+        if isinstance(cell, str):
+            subjects = [s.strip() for s in cell.split(',') if s.strip()]
+            subjects_taken.update(subjects)
+
+# binary 벡터화
+user_vector = [1 if subject in subjects_taken else 0 for subject in all_subjects]
+
+user_vector_df = pd.DataFrame([user_vector], columns=all_subjects)
+# ===================================================================
 # 확인
-print(vector_df.head())
-vector_df.to_excel('user_course_vectors.xlsx', index=False, engine='openpyxl')
+#print(user_df.head())
+print(user_vector_df.head())
+user_vector_df.to_excel('user_vector.xlsx', index=False, engine='openpyxl')
