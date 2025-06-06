@@ -66,40 +66,7 @@ course_pairs = [
     ('데이터통신', '컴퓨터네트워크', 'rec_comm_network')
 ]
 
-# 7. 실제 이수 순서 변수 생성
-student_courses = []
-
-for idx, row in df_filtered.iterrows():  # 이상치 제거된 데이터 사용
-    courses_by_semester = extract_courses(row, semester_cols)
-    student_info = {'student_id': idx}
-    
-    # 각 과목 쌍에 대해 이수 순서 확인
-    for course_a, course_b, rec_col in course_pairs:
-        # 두 과목 모두 수강한 경우에만 분석
-        if course_a in courses_by_semester and course_b in courses_by_semester:
-            sem_a = courses_by_semester[course_a]
-            sem_b = courses_by_semester[course_b]
-            
-            # 순서 변수 생성 (A를 먼저 들었으면 1, 아니면 0)
-            took_a_first = 1 if sem_a < sem_b else 0
-            
-            pair_key = f"{course_a}_{course_b}"
-            student_info[f"sem_{course_a}"] = sem_a
-            student_info[f"sem_{course_b}"] = sem_b
-            student_info[f"took_{pair_key}_first"] = took_a_first
-            
-            # 추천 여부도 함께 저장 (모름 응답은 NaN으로 유지)
-            student_info[f"recommend_{pair_key}"] = row[rec_col]
-    
-    student_courses.append(student_info)
-
-# 학생별 과목 이수 순서 및 추천 데이터프레임 생성
-order_df = pd.DataFrame(student_courses)
-print("\n이수 순서 데이터프레임 크기:", order_df.shape)
-print("\n이수 순서 데이터프레임 샘플:")
-print(order_df.head(2))
-
-# 8. 이상치 탐지 (LOF 적용)
+# 7. 이상치 탐지 (LOF 적용) - 순서 변경: 이제 먼저 이상치를 탐지합니다
 # 추천 응답 패턴만 사용하여 이상치 식별
 if len(df) > 10:  # LOF는 최소 10개 이상의 샘플이 필요
     # 결측치(모름 응답)는 제외하고 예/아니오 응답만으로 이상치 탐지
@@ -133,6 +100,39 @@ else:
     print("\n표본 크기가 너무 작아 LOF를 적용하지 않음")
     df['is_outlier'] = False
     df_filtered = df.copy()
+
+# 8. 실제 이수 순서 변수 생성 - 이제 df_filtered를 사용합니다
+student_courses = []
+
+for idx, row in df_filtered.iterrows():  # 이상치 제거된 데이터 사용
+    courses_by_semester = extract_courses(row, semester_cols)
+    student_info = {'student_id': idx}
+    
+    # 각 과목 쌍에 대해 이수 순서 확인
+    for course_a, course_b, rec_col in course_pairs:
+        # 두 과목 모두 수강한 경우에만 분석
+        if course_a in courses_by_semester and course_b in courses_by_semester:
+            sem_a = courses_by_semester[course_a]
+            sem_b = courses_by_semester[course_b]
+            
+            # 순서 변수 생성 (A를 먼저 들었으면 1, 아니면 0)
+            took_a_first = 1 if sem_a < sem_b else 0
+            
+            pair_key = f"{course_a}_{course_b}"
+            student_info[f"sem_{course_a}"] = sem_a
+            student_info[f"sem_{course_b}"] = sem_b
+            student_info[f"took_{pair_key}_first"] = took_a_first
+            
+            # 추천 여부도 함께 저장 (모름 응답은 NaN으로 유지)
+            student_info[f"recommend_{pair_key}"] = row[rec_col]
+    
+    student_courses.append(student_info)
+
+# 학생별 과목 이수 순서 및 추천 데이터프레임 생성
+order_df = pd.DataFrame(student_courses)
+print("\n이수 순서 데이터프레임 크기:", order_df.shape)
+print("\n이수 순서 데이터프레임 샘플:")
+print(order_df.head(2))
 
 # 9. 기술 통계 계산
 statistics = []
