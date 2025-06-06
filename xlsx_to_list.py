@@ -40,3 +40,10 @@ df = pd.DataFrame(dataframe)
 # Code to debug above code (line 26~36)
 # print(df)
 # print(dataframe)
+
+total_courses = set()
+
+for semester in dataframe:
+        if semester == 'student_ID': continue
+        for stu_no in range(students):
+            total_courses.update(dataframe[semester][stu_no])
