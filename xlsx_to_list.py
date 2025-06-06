@@ -94,7 +94,7 @@ second_year_cols = ['2y_1s', '2y_2s']
 third_year_cols = ['3y_1s', '3y_2s']
 fourth_year_cols = ['4y_1s', '4y_2s']
 
-# A function to find sequences of taking courses
+# A function to find sequences of taking courses (on a yearly basis)
 # Returns: dict: {(course1, course2): ratio} patterns
 def find_course_associations(df, first_year, first_year_cols, second_year_cols, total_courses, min_support=3, min_confidence=0.5):
 
@@ -133,7 +133,53 @@ def find_course_associations(df, first_year, first_year_cols, second_year_cols, 
     
     return result
 
-result1to2 = find_course_associations(
+# A function to find sequences of taking courses (on a semester-by-semester basis)
+# Returns: dict: {(course1, course2): ratio} patterns
+def find_semester_course_associations(df, from_semester, to_semester, total_courses, min_support=3, min_confidence=0.5):
+    """
+    한 학기에서 다음 학기까지 수강 과목 연관성을 분석하는 함수
+
+    Parameters:
+        df (DataFrame): 수강 데이터프레임
+        from_semester (str): 시작 학기 컬럼명 (예: '1y_1s')
+        to_semester (str): 다음 학기 컬럼명 (예: '1y_2s')
+        total_courses (set): 전체 과목 집합
+        min_support (int): 최소 학생 수
+        min_confidence (float): 최소 비율
+
+    Returns:
+        dict: {(과목1, 과목2): 비율}
+    """
+    result = {}
+
+    for course in total_courses:
+        # Filter who took 'course' in from_semester
+        students_with_course = df[df[from_semester].apply(lambda x: course in x)]
+
+        if students_with_course.empty:
+            continue
+
+        total = len(students_with_course)
+
+        # Find the subjects that filtered students took in to_semesters
+        course_counter = {}
+        for next_courses in students_with_course[to_semester]:
+            for c in next_courses:
+                if c in total_courses:
+                    course_counter[c] = course_counter.get(c, 0) + 1
+
+        # Generates patterns
+        for next_course, count in course_counter.items():
+            ratio = count / total
+            if ratio >= min_confidence and count >= min_support:
+                result[(course, next_course)] = round(ratio, 3)
+
+    for (first, next_course), ratio in result.items():
+        print(f"{from_semester} → {to_semester}: '{first}' 수강자의 {ratio*100:.1f}%가 다음 학기에 '{next_course}'를 수강함.")
+
+    return result
+
+year_result1to2 = find_course_associations(
     df,
     first_year=1,
     first_year_cols=['1y_1s', '1y_2s'],
@@ -143,7 +189,7 @@ result1to2 = find_course_associations(
     min_confidence=0.5
 )
 
-result2to3 = find_course_associations(
+year_result2to3 = find_course_associations(
     df,
     first_year=2,
     first_year_cols=['2y_1s', '2y_2s'],
@@ -153,7 +199,7 @@ result2to3 = find_course_associations(
     min_confidence=0.5
 )
 
-result3to4 = find_course_associations(
+year_result3to4 = find_course_associations(
     df,
     first_year=3,
     first_year_cols=['3y_1s', '3y_2s'],
@@ -162,3 +208,11 @@ result3to4 = find_course_associations(
     min_support=3,
     min_confidence=0.5
 )
+
+sem_result1to2 = find_semester_course_associations(df, '1y_1s', '1y_2s', total_courses)
+sem_result2to3 = find_semester_course_associations(df, '1y_2s', '2y_1s', total_courses)
+sem_result3to4 = find_semester_course_associations(df, '2y_1s', '2y_2s', total_courses)
+sem_result4to5 = find_semester_course_associations(df, '2y_2s', '3y_1s', total_courses)
+sem_result5to6 = find_semester_course_associations(df, '3y_1s', '3y_2s', total_courses)
+sem_result6to7 = find_semester_course_associations(df, '3y_2s', '4y_1s', total_courses)
+sem_result7to8 = find_semester_course_associations(df, '4y_1s', '4y_2s', total_courses)
