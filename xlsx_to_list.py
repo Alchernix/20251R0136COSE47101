@@ -136,20 +136,7 @@ def find_course_associations(df, first_year, first_year_cols, second_year_cols, 
 # A function to find sequences of taking courses (on a semester-by-semester basis)
 # Returns: dict: {(course1, course2): ratio} patterns
 def find_semester_course_associations(df, from_semester, to_semester, total_courses, min_support=3, min_confidence=0.5):
-    """
-    한 학기에서 다음 학기까지 수강 과목 연관성을 분석하는 함수
 
-    Parameters:
-        df (DataFrame): 수강 데이터프레임
-        from_semester (str): 시작 학기 컬럼명 (예: '1y_1s')
-        to_semester (str): 다음 학기 컬럼명 (예: '1y_2s')
-        total_courses (set): 전체 과목 집합
-        min_support (int): 최소 학생 수
-        min_confidence (float): 최소 비율
-
-    Returns:
-        dict: {(과목1, 과목2): 비율}
-    """
     result = {}
 
     for course in total_courses:
@@ -184,9 +171,7 @@ year_result1to2 = find_course_associations(
     first_year=1,
     first_year_cols=['1y_1s', '1y_2s'],
     second_year_cols=['2y_1s', '2y_2s'],
-    total_courses=total_courses,
-    min_support=3,
-    min_confidence=0.5
+    total_courses=total_courses
 )
 
 year_result2to3 = find_course_associations(
@@ -194,9 +179,7 @@ year_result2to3 = find_course_associations(
     first_year=2,
     first_year_cols=['2y_1s', '2y_2s'],
     second_year_cols=['3y_1s', '3y_2s'],
-    total_courses=total_courses,
-    min_support=3,
-    min_confidence=0.5
+    total_courses=total_courses
 )
 
 year_result3to4 = find_course_associations(
@@ -204,9 +187,7 @@ year_result3to4 = find_course_associations(
     first_year=3,
     first_year_cols=['3y_1s', '3y_2s'],
     second_year_cols=['4y_1s', '4y_2s'],
-    total_courses=total_courses,
-    min_support=3,
-    min_confidence=0.5
+    total_courses=total_courses
 )
 
 sem_result1to2 = find_semester_course_associations(df, '1y_1s', '1y_2s', total_courses)
