@@ -1,4 +1,4 @@
-from preprocess_data import get_preprocessed_data
+from .preprocess_data import get_preprocessed_data
 from mlxtend.preprocessing import TransactionEncoder
 from mlxtend.frequent_patterns import apriori
 import pandas as pd

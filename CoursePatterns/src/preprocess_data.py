@@ -1,4 +1,4 @@
-def get_preprocessed_data(file_path='raw_data.xlsx', mapping_path='course_name.json'):
+def get_preprocessed_data(file_path='./data/raw_data.xlsx', mapping_path='./data/course_name.json'):
     import pandas as pd
     import json
 

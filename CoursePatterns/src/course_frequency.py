@@ -1,5 +1,5 @@
 def get_course_frequencies():
-    from preprocess_data import get_preprocessed_data
+    from .preprocess_data import get_preprocessed_data
     import pandas as pd
     from collections import Counter
 
