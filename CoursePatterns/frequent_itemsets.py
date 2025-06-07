@@ -1,7 +1,7 @@
 def get_frequent_itemsets(min_sup=0.5):
     from preprocess_data import get_preprocessed_data
     from mlxtend.preprocessing import TransactionEncoder
-    from mlxtend.frequent_patterns import apriori, association_rules
+    from mlxtend.frequent_patterns import apriori
     import pandas as pd
 
     df = get_preprocessed_data("raw_data.xlsx", "course_name.json")
