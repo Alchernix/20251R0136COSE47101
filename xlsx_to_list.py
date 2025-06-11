@@ -117,10 +117,10 @@ def find_course_associations(df, first_year, first_year_cols, second_year_cols, 
         for next_course, count in course_counter.items():
             ratio = count / total
             if ratio >= min_confidence and count >= min_support:
-                result[(course, next_course)] = round(ratio, 3)
+                result[(course, next_course, count, total)] = round(ratio, 3)
 
-    for (first, next_course), ratio in result.items():
-        print(str(first_year) + "학년->" + str(first_year + 1) + "학년: " + f"'{first}'를 들은 학생 중 {ratio*100:.1f}%가 다음 해에 '{next_course}'를 수강함.")
+    for (first, next_course, result_count, result_total), ratio in result.items():
+        print(str(first_year) + "학년->" + str(first_year + 1) + "학년: " + f"'{first}' 수강생 중 {ratio*100:.1f}%가 다음 해에 '{next_course}'을(를) 수강함({result_count}/{result_total}).")
 
     return result
 
@@ -150,16 +150,16 @@ def find_semester_course_associations(df, from_semester, to_semester, total_cour
         for next_course, count in course_counter.items():
             ratio = count / total
             if ratio >= min_confidence and count >= min_support:
-                result[(course, next_course)] = round(ratio, 3)
+                result[(course, next_course, count, total)] = round(ratio, 3)
 
-    for (first, next_course), ratio in result.items():
-        print(f"{from_semester} → {to_semester}: '{first}' 수강자의 {ratio*100:.1f}%가 다음 학기에 '{next_course}'를 수강함.")
+    for (first, next_course, result_count, result_total), ratio in result.items():
+        print(f"{from_semester} → {to_semester}: '{first}' 수강생의 {ratio*100:.1f}%가 다음 학기에 '{next_course}'을(를) 수강함({result_count}/{result_total}).")
 
     return result
 
 # (1) For all students responded in our survey
 
-print("\n\n모든 학생들 대상 분석 결과(minsup = 3, mincoeff = 0.5)\n")
+print("\n\n모든 학생들 대상 분석 결과(minsup = 3, minconf = 0.5)\n")
 
 year_result1to2 = find_course_associations(
     df_all,
@@ -195,7 +195,7 @@ sem_result7to8 = find_semester_course_associations(df_all, '4y_1s', '4y_2s', tot
 
 # (2) For main major of CSE students responded in our survey
 
-print("\n\n컴퓨터학과 본전공생 대상 분석 결과(minsup = 3, mincoeff = 0.5)\n")
+print("\n\n컴퓨터학과 본전공생 대상 분석 결과(minsup = 3, minconf = 0.5)\n")
 
 year_result1to2 = find_course_associations(
     df_primary,
@@ -231,7 +231,7 @@ sem_result7to8 = find_semester_course_associations(df_primary, '4y_1s', '4y_2s',
 
 # (3) For double major of CSE students responded in our survey
 
-print("\n\n컴퓨터학과 이중/복수/융합/부전공공생 대상 분석 결과(minsup = 3, mincoeff = 0.5)\n")
+print("\n\n컴퓨터학과 이중/복수/융합/부전공생 대상 분석 결과(minsup = 3, minconf = 0.5)\n")
 
 year_result1to2 = find_course_associations(
     df_not_primary,
