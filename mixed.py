@@ -349,18 +349,13 @@ for prereq, next_course, coeff in prerequisites:
 # 가중치 합계 기준으로 정렬
 sorted_recommendations = sorted(recommend_scores.items(), key=lambda x: x[1], reverse=True)
 
+# 결과 출력
+rec = recommend(user_df_processed.iloc[0], course_df, tag_cols, semester_cols)
+print(f"-- 태그 기반 추천 Top-{len(rec)} --")    # def recommend에서 N=5과목으로 설정
+print(rec.to_string(index=False))
+
+print()
+
 print("-- 수강기록 기반 추천 Top-5 --")
 for subject, score in sorted_recommendations[:5]:
     print(f"{subject}: {score:.2f}점")
-
-#선수관계========================================================================
-# for prereq, next_course, coeff in prerequisites:
-#     if prereq in taken:  # taken: 사용자 수강 이력
-#         candidates.loc[candidates['Course_Name'] == next_course, 'cos_sim'] *= (1 + coeff * 0.1)
-# # ==========================================
-
-
-# 결과 출력
-rec = recommend(user_df_processed.iloc[0], course_df, tag_cols, semester_cols)
-print(f"\n-- 태그 추천 Top-{len(rec)} --")    # def recommend에서 N=5과목으로 설정
-print(rec.to_string(index=False))
