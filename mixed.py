@@ -4,8 +4,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 course_tag_path = 'course_tag.xlsx' #태그 파일
 df = pd.read_excel('data.xlsx', skiprows=1, header=None, usecols='C:J', engine='openpyxl') # 전체 유저 데이터 파일
-user_df = pd.read_excel('user_data.xlsx', engine='openpyxl') # 추천받을 유저 파일
-
+raw_user = pd.read_excel('user_data.xlsx', engine='openpyxl')
+user_df = pd.read_excel('user_data.xlsx', header=None, skiprows=1, engine='openpyxl')
 # 태그 추천=============================================================
 # course_tag.xlsx 전처리
 raw_course = pd.read_excel(course_tag_path, header=1, skiprows=[2, 3])
@@ -39,8 +39,8 @@ tag_cols = [
     c for c in raw_course.columns
     if (not c.startswith('Unnamed')) and (c not in ['Course_Code', 'Course_Name'])
 ]
-print("추출된 태그 컬럼(tag_cols) 리스트:")
-print(tag_cols, "\n")
+# print("추출된 태그 컬럼(tag_cols) 리스트:")
+# print(tag_cols, "\n")
 
 # "과목명(Course_Name)"이 NaN인 행 제거
 course_df = raw_course[raw_course['Course_Name'].notna()].copy().reset_index(drop=True)
@@ -57,8 +57,6 @@ for t in tag_cols:
 #추천받을 유저 파일 전처리
 # user_data.xlsx 전처리
 #    - “학기에 들은 컴퓨터학과 전공 과목” 칼럼들을 모두 찾아 수강 과목 리스트로 합침
-
-raw_user = user_df
 
 # '학기에 들은' 이라는 문구가 포함된 칼럼명 모두 수집
 semester_cols = [c for c in raw_user.columns if '학기에 들은' in c]
@@ -79,8 +77,8 @@ def collect_taken_courses(row):
 user_df_processed = raw_user.copy()
 user_df_processed['taken_courses'] = user_df_processed.apply(collect_taken_courses, axis=1)
 
-print("태그 추천 - 추천받을 유저 전처리")
-print(user_df_processed)
+# print("태그 추천 - 추천받을 유저 전처리")
+# print(user_df_processed)
 
 #과목 태그간 관계 반영
 # 1) tag_cols 정의된 이후, 연관 태그 자동 생성
@@ -101,12 +99,12 @@ related_tags = {
     tag_cols[i]: [tag_cols[j] for j in range(n_tags) if jaccard[i, j] >= threshold]
     for i in range(n_tags)
 }
-print(related_tags)
+# print(related_tags)
 
 #    - course_vectors: numpy array shape = (num_courses, num_tags)
 course_vectors = course_df[tag_cols].values.astype(float)  # shape (M, T)   ->  58 x 16 (58과목에 대한 16개 tag들)
 
-print(course_df[tag_cols].head())   # 58과목에 대한 과목별 태그벡터들 matrix
+# print(course_df[tag_cols].head())   # 58과목에 대한 과목별 태그벡터들 matrix
 
 #사용자 태그 벡터 생성
 def build_user_vector(user_row, course_df, tag_cols, semester_cols,
@@ -169,6 +167,106 @@ def build_user_vector(user_row, course_df, tag_cols, semester_cols,
         avg_vec = avg_vec / total
 
     return avg_vec
+#수강기록 기반 추천=========================================================================
+# 전체 과목 목록 추출+정렬
+subject_set = set()
+
+for row in df.itertuples(index=False):
+    for cell in row:
+        if isinstance(cell, str):  # 셀이 문자열일 때만 처리
+            subjects = [s.strip() for s in cell.split(',') if s.strip()]
+            subject_set.update(subjects)
+
+all_subjects = sorted(subject_set)
+
+# 사용자별 수강 과목 벡터 생성 - 최근에 들은 과목일수록 가중치 부여한 버전
+user_vectors = []
+
+for row in df.itertuples(index=False):
+    # (1) 이 학생이 수강한 학기(셀) 인덱스(컬럼 번호) 모으기
+    non_null_semesters = [i for i, cell in enumerate(row) if isinstance(cell, str)]
+    k = len(non_null_semesters)   # 이 학생이 수강한 총 학기 수
+    
+    # (2) 빈 벡터(과목 수 만큼) 생성 (float)
+    vec = [0.0] * len(all_subjects)
+    
+    # (3) 각 학기별로 가중치 부여 → 과목마다 weight 더하기
+    #     i번째 non-null 학기 → weight = (i+1) / k
+    for idx_in_list, col_idx in enumerate(non_null_semesters):
+        weight = (idx_in_list + 1) / k
+        cell = row[col_idx]
+        
+        # 쉼표로 분리된 과목 문자열 → 과목마다 strip
+        subjects = [s.strip() for s in cell.split(',') if s.strip()]
+        for subj in subjects:
+            if subj in all_subjects:
+                subj_index = all_subjects.index(subj)
+                vec[subj_index] += weight
+    
+    user_vectors.append(vec)
+
+# 4. DataFrame으로 변환
+vector_df = pd.DataFrame(user_vectors, columns=all_subjects)
+
+# 추천받을 사용자의 수강 벡터 생성 - 최근에 들은 과목일수록 가중치 부여한 버전
+row = next(user_df.itertuples(index=False))  # 첫 번째(유일한) 사용자의 튜플
+
+# (2) 이 사용자가 과목을 들은 ‘학기 인덱스’(컬럼 번호) 수집
+non_null_semesters = [i for i, cell in enumerate(row) if isinstance(cell, str)]
+k = len(non_null_semesters)   # 이 사용자가 과목을 수강한 총 학기 수
+
+# (3) 과목별 가중치를 담기 위한 벡터 초기화 (float 타입)
+user_weighted_vec = [0.0] * len(all_subjects)
+
+# (4) 각 학기마다 (가중치) 부여 → 그 학기 과목에 누적
+for idx_in_list, col_idx in enumerate(non_null_semesters):
+    weight = (idx_in_list + 1) / k     # 예: k=3일 때, 학기 순서대로 1/3, 2/3, 3/3
+    cell = row[col_idx]                # 해당 학기 셀(쉼표로 구분된 과목 문자열)
+
+    subjects = [s.strip() for s in cell.split(',') if s.strip()]
+    for subj in subjects:
+        if subj in all_subjects:
+            subj_index = all_subjects.index(subj)
+            user_weighted_vec[subj_index] += weight
+
+# (5) DataFrame으로 변환
+user_vector_df = pd.DataFrame([user_weighted_vec], columns=all_subjects)
+
+# 코사인 유사도 계산
+similarities = cosine_similarity(user_vector_df, vector_df)[0]
+
+similarity_df = pd.DataFrame({
+    'user_index': vector_df.index,
+    'similarity': similarities
+})
+
+similarity_df = similarity_df.sort_values(by='similarity', ascending=False)
+
+# 나와 유사한 n명이 들은 과목 추천
+# 유사도 threshold = 0.5
+top_users = similarity_df[similarity_df['similarity'] >= 0.5]
+top_users_vectors = vector_df.iloc[top_users['user_index']]
+
+# 내가 아직 안 들은 과목 (user_vector에서 0인 과목 인덱스)
+user_vector = user_vector_df.iloc[0].values  # Series → numpy array
+not_taken_indices = [i for i, val in enumerate(user_vector) if val == 0]
+not_taken_subjects = [all_subjects[i] for i in not_taken_indices]
+
+# 누가 어떤 과목을 들었는지 count
+recommend_scores = {}
+
+for subject in not_taken_subjects:
+    # 해당 과목에 부여된 가중치 총합(소수 포함)
+    score = top_users_vectors[subject].sum()
+    if score > 0:
+        recommend_scores[subject] = score
+
+# 가중치 합계 기준으로 정렬
+sorted_recommendations = sorted(recommend_scores.items(), key=lambda x: x[1], reverse=True)
+
+print("추천 과목 (가중치 합계 기준):\n")
+for subject, score in sorted_recommendations:
+    print(f"{subject}: {score:.2f}점")
 
 #선수관계 반영
 # 추천 함수
@@ -249,7 +347,6 @@ def recommend(user_row, course_df, tag_cols, semester_cols, N=5,
     return candidates.nlargest(N, 'cos_sim')[['Course_Code','Course_Name','cos_sim']].reset_index(drop=True)
 
 # 결과 출력
-for idx in range(min(16, len(user_df_processed))):
-    rec = recommend(user_df_processed.iloc[idx], course_df, tag_cols, semester_cols)
-    print(f"\n-- 사용자 {idx+1} 추천 Top-{len(rec)} --")    # def recommend에서 N=5과목으로 설정
-    print(rec.to_string(index=False))
+rec = recommend(user_df_processed.iloc[0], course_df, tag_cols, semester_cols)
+print(f"\n-- 추천 Top-{len(rec)} --")    # def recommend에서 N=5과목으로 설정
+print(rec.to_string(index=False))
