@@ -124,9 +124,11 @@ similarity_df = pd.DataFrame({
 })
 
 similarity_df = similarity_df.sort_values(by='similarity', ascending=False)
+
+# print(similarity_df.head(10).to_string(index=False))
 # ===================================================================
 # 나와 유사한 n명이 들은 과목 추천
-# 유사도 threshold = 0.6
+# 유사도 threshold = 0.5
 top_users = similarity_df[similarity_df['similarity'] >= 0.5]
 top_users_vectors = vector_df.iloc[top_users['user_index']]
 
