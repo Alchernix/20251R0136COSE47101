@@ -6,6 +6,58 @@ course_tag_path = 'course_tag.xlsx' #태그 파일
 df = pd.read_excel('data.xlsx', skiprows=1, header=None, usecols='C:J', engine='openpyxl') # 전체 유저 데이터 파일
 raw_user = pd.read_excel('user_data.xlsx', engine='openpyxl')
 user_df = pd.read_excel('user_data.xlsx', header=None, skiprows=1, engine='openpyxl')
+
+# ===== 추가된 선수관계 가중치 적용 부분 =====
+prerequisites = [
+    # ===== 본전공 직전학기 데이터 =====
+    ('자료구조', '알고리즘', 0.75),      # 본전공 1학년_2학기 → 2학년_1학기
+    ('자료구조', '계산이론', 1.0),       # 본전공 1학년_2학기 → 2학년_1학기
+    ('자료구조', '논리설계', 0.75),      # 본전공 1학년_2학기 → 2학년_1학기
+    ('논리설계', '알고리즘', 0.529),     # 본전공 2학년_1학기 → 2학년_2학기
+    ('논리설계', '컴퓨터구조', 0.824),   # 본전공 2학년_1학기 → 2학년_2학기
+    ('계산이론', '컴퓨터구조', 0.652),   # 본전공 2학년_1학기 → 2학년_2학기
+    ('알고리즘', '컴퓨터구조', 0.538),   # 본전공 2y_1s → 2y_2s
+    ('자료구조', '컴퓨터구조', 0.632),   # 본전공 2y_1s → 2y_2s
+    ('이산수학', '컴퓨터구조', 0.6),     # 본전공 2y_1s → 2y_2s
+    ('공학수학', '운영체제', 0.75),      # 본전공 2y_2s → 3y_1s
+    ('데이터베이스', '운영체제', 0.6),   # 본전공 2y_2s → 3y_1s
+    ('전자기학', '컴퓨터네트워크', 0.5), # 본전공 2y_2s → 3y_1s
+    ('전자기학', '운영체제', 0.667),     # 본전공 2y_2s → 3y_1s
+    ('프로그래밍언어', '운영체제', 0.667),# 본전공 2y_2s → 3y_1s
+    ('프로그래밍언어', '데이터베이스', 0.667),# 본전공 2y_2s → 3y_1s
+    ('알고리즘', '운영체제', 0.636),     # 본전공 2y_2s → 3y_1s
+    ('알고리즘', '데이터베이스', 0.545), # 본전공 2y_2s → 3y_1s
+    ('컴퓨터네트워크', '운영체제', 0.5), # 본전공 2y_2s → 3y_1s
+    ('데이터통신', '운영체제', 0.6),     # 본전공 2y_2s → 3y_1s
+    ('데이터통신', '컴퓨터네트워크', 0.6),# 본전공 2y_2s → 3y_1s
+    ('데이터통신', '인공지능', 0.8),     # 본전공 2y_2s → 3y_1s
+    ('기계학습', '컴퓨터네트워크', 0.75),# 본전공 2y_2s → 3y_1s
+    ('기계학습', '인공지능', 0.75),      # 본전공 2y_2s → 3y_1s
+    ('확률및랜덤과정', '운영체제', 0.75),# 본전공 2y_2s → 3y_1s
+    ('컴퓨터구조', '운영체제', 0.647),   # 본전공 2y_2s → 3y_1s
+
+    # ===== 전체 직전학기 데이터 (본전공에 없는 경우만 추가) =====
+    ('자료구조', '운영체제', 0.75),      # 전체 2학년_2학기 → 3학년_1학기
+    ('공학수학', '컴퓨터네트워크', 0.5), # 전체 2학년_2학기 → 3학년_1학기
+    ('공학수학', '인공지능', 0.5),       # 전체 2학년_2학기 → 3학년_1학기
+    ('전자기학', '데이터베이스', 0.5),   # 전체 2학년_2학기 → 3학년_1학기
+    ('전자기학', '인공지능', 0.5),       # 전체 2y_2s → 3y_1s
+    ('프로그래밍언어', '컴퓨터그래픽스', 0.5),# 전체 2y_2s → 3y_1s
+    ('프로그래밍언어', '데이터과학', 0.5), # 전체 2y_2s → 3y_1s
+    ('컴퓨터네트워크', '데이터과학', 0.5),# 전체 2y_2s → 3y_1s
+
+    # ===== 연도 단위 데이터 (직전학기에 없는 경우만 보조자료로 추가) =====
+    ('자료구조', '인공지능', 0.6),       # 본전공/전체 1학년→2학년
+    ('자료구조', '컴퓨터구조', 0.6),     # 본전공/전체 1학년→2학년
+    ('기계학습', '딥러닝', 0.75),        # 본전공/전체 2학년→3학년
+    ('기계학습', '데이터베이스', 0.75),  # 본전공/전체 2학년→3학년
+    ('이산수학', '운영체제', 0.68),      # 본전공/전체 2학년→3학년
+    ('공학수학', '신호및시스템', 0.75),  # 본전공/전체 3학년→4학년
+    ('기계학습', '자연어처리', 0.75),    # 본전공/전체 3학년→4학년
+    ('컴파일러', '자연어처리', 0.75),    # 본전공/이중전공 3학년→4학년
+    ('딥러닝', '자연어처리', 0.667),     # 이중전공 3학년→4학년
+    ('컴퓨터구조', '딥러닝', 0.556),     # 이중전공 3학년→4학년
+]
 # 태그 추천=============================================================
 # course_tag.xlsx 전처리
 raw_course = pd.read_excel(course_tag_path, header=1, skiprows=[2, 3])
@@ -167,6 +219,31 @@ def build_user_vector(user_row, course_df, tag_cols, semester_cols,
         avg_vec = avg_vec / total
 
     return avg_vec
+# 태그 추천 함수
+def recommend(user_row, course_df, tag_cols, semester_cols, N=5,
+              tag_adjustment=True, time_weight=True, w=1.2, bonus=0.1):
+    uvec = build_user_vector(user_row, course_df, tag_cols, semester_cols,
+                             tag_adjustment, time_weight, w, bonus)
+    if not uvec.any():
+        return pd.DataFrame(columns=['Course_Code','Course_Name','cos_sim'])
+
+    taken = user_row.get('taken_courses', [])
+    candidates = course_df[~course_df['Course_Name'].isin(taken)].copy()
+    if candidates.empty:
+        return pd.DataFrame(columns=['Course_Code','Course_Name','cos_sim'])
+
+    cand_vecs = candidates[tag_cols].values.astype(float)
+    sims = cosine_similarity(cand_vecs, uvec.reshape(1, -1)).reshape(-1)    ############# 사용자 태그 벡터와, 미리 생성해놓았던 과목들 태그 벡터 간 코사인 유사도 계산
+
+    candidates['cos_sim'] = sims
+
+    #선수관계 반영
+    for prereq, next_course, coeff in prerequisites:
+        if prereq in taken:  # taken: 사용자 수강 이력
+            candidates.loc[candidates['Course_Name'] == next_course, 'cos_sim'] *= (1 + coeff * 0.1)
+            # coeff 값을 바로 쓰는 게 아니라 10% 정도 수준으로 축소된 형태로 사용하여, 선수관계가 과하게 영향을 미치지 않고 자연스럽게 소폭만 추천에 영향을 주도록 조정
+    
+    return candidates.nlargest(N, 'cos_sim')[['Course_Name','cos_sim']].reset_index(drop=True)
 #수강기록 기반 추천=========================================================================
 # 전체 과목 목록 추출+정렬
 subject_set = set()
@@ -250,7 +327,9 @@ top_users_vectors = vector_df.iloc[top_users['user_index']]
 # 내가 아직 안 들은 과목 (user_vector에서 0인 과목 인덱스)
 user_vector = user_vector_df.iloc[0].values  # Series → numpy array
 not_taken_indices = [i for i, val in enumerate(user_vector) if val == 0]
+taken_indices = [i for i, val in enumerate(user_vector) if val == 0]
 not_taken_subjects = [all_subjects[i] for i in not_taken_indices]
+taken_subjects = [all_subjects[i] for i in taken_indices]
 
 # 누가 어떤 과목을 들었는지 count
 recommend_scores = {}
@@ -261,92 +340,27 @@ for subject in not_taken_subjects:
     if score > 0:
         recommend_scores[subject] = score
 
+#선수관계로 보정
+for prereq, next_course, coeff in prerequisites:
+    if prereq in taken_subjects and next_course in recommend_scores:
+        recommend_scores[next_course] *= (1 + coeff * 0.1)
+        # coeff * 0.1 만큼만 보정 → 10% 수준의 영향력
+
 # 가중치 합계 기준으로 정렬
 sorted_recommendations = sorted(recommend_scores.items(), key=lambda x: x[1], reverse=True)
 
-print("추천 과목 (가중치 합계 기준):\n")
-for subject, score in sorted_recommendations:
+print("-- 수강기록 기반 추천 Top-5 --")
+for subject, score in sorted_recommendations[:5]:
     print(f"{subject}: {score:.2f}점")
 
-#선수관계 반영
-# 추천 함수
-def recommend(user_row, course_df, tag_cols, semester_cols, N=5,
-              tag_adjustment=True, time_weight=True, w=1.2, bonus=0.1):
-    uvec = build_user_vector(user_row, course_df, tag_cols, semester_cols,
-                             tag_adjustment, time_weight, w, bonus)
-    if not uvec.any():
-        return pd.DataFrame(columns=['Course_Code','Course_Name','cos_sim'])
+#선수관계========================================================================
+# for prereq, next_course, coeff in prerequisites:
+#     if prereq in taken:  # taken: 사용자 수강 이력
+#         candidates.loc[candidates['Course_Name'] == next_course, 'cos_sim'] *= (1 + coeff * 0.1)
+# # ==========================================
 
-    taken = user_row.get('taken_courses', [])
-    candidates = course_df[~course_df['Course_Name'].isin(taken)].copy()
-    if candidates.empty:
-        return pd.DataFrame(columns=['Course_Code','Course_Name','cos_sim'])
-
-    cand_vecs = candidates[tag_cols].values.astype(float)
-    sims = cosine_similarity(cand_vecs, uvec.reshape(1, -1)).reshape(-1)    ############# 사용자 태그 벡터와, 미리 생성해놓았던 과목들 태그 벡터 간 코사인 유사도 계산
-
-    candidates['cos_sim'] = sims
-
-    # ===== 추가된 선수관계 가중치 적용 부분 =====
-    prerequisites = [
-        # ===== 본전공 직전학기 데이터 =====
-        ('자료구조', '알고리즘', 0.75),      # 본전공 1학년_2학기 → 2학년_1학기
-        ('자료구조', '계산이론', 1.0),       # 본전공 1학년_2학기 → 2학년_1학기
-        ('자료구조', '논리설계', 0.75),      # 본전공 1학년_2학기 → 2학년_1학기
-        ('논리설계', '알고리즘', 0.529),     # 본전공 2학년_1학기 → 2학년_2학기
-        ('논리설계', '컴퓨터구조', 0.824),   # 본전공 2학년_1학기 → 2학년_2학기
-        ('계산이론', '컴퓨터구조', 0.652),   # 본전공 2학년_1학기 → 2학년_2학기
-        ('알고리즘', '컴퓨터구조', 0.538),   # 본전공 2y_1s → 2y_2s
-        ('자료구조', '컴퓨터구조', 0.632),   # 본전공 2y_1s → 2y_2s
-        ('이산수학', '컴퓨터구조', 0.6),     # 본전공 2y_1s → 2y_2s
-        ('공학수학', '운영체제', 0.75),      # 본전공 2y_2s → 3y_1s
-        ('데이터베이스', '운영체제', 0.6),   # 본전공 2y_2s → 3y_1s
-        ('전자기학', '컴퓨터네트워크', 0.5), # 본전공 2y_2s → 3y_1s
-        ('전자기학', '운영체제', 0.667),     # 본전공 2y_2s → 3y_1s
-        ('프로그래밍언어', '운영체제', 0.667),# 본전공 2y_2s → 3y_1s
-        ('프로그래밍언어', '데이터베이스', 0.667),# 본전공 2y_2s → 3y_1s
-        ('알고리즘', '운영체제', 0.636),     # 본전공 2y_2s → 3y_1s
-        ('알고리즘', '데이터베이스', 0.545), # 본전공 2y_2s → 3y_1s
-        ('컴퓨터네트워크', '운영체제', 0.5), # 본전공 2y_2s → 3y_1s
-        ('데이터통신', '운영체제', 0.6),     # 본전공 2y_2s → 3y_1s
-        ('데이터통신', '컴퓨터네트워크', 0.6),# 본전공 2y_2s → 3y_1s
-        ('데이터통신', '인공지능', 0.8),     # 본전공 2y_2s → 3y_1s
-        ('기계학습', '컴퓨터네트워크', 0.75),# 본전공 2y_2s → 3y_1s
-        ('기계학습', '인공지능', 0.75),      # 본전공 2y_2s → 3y_1s
-        ('확률및랜덤과정', '운영체제', 0.75),# 본전공 2y_2s → 3y_1s
-        ('컴퓨터구조', '운영체제', 0.647),   # 본전공 2y_2s → 3y_1s
-
-        # ===== 전체 직전학기 데이터 (본전공에 없는 경우만 추가) =====
-        ('자료구조', '운영체제', 0.75),      # 전체 2학년_2학기 → 3학년_1학기
-        ('공학수학', '컴퓨터네트워크', 0.5), # 전체 2학년_2학기 → 3학년_1학기
-        ('공학수학', '인공지능', 0.5),       # 전체 2학년_2학기 → 3학년_1학기
-        ('전자기학', '데이터베이스', 0.5),   # 전체 2학년_2학기 → 3학년_1학기
-        ('전자기학', '인공지능', 0.5),       # 전체 2y_2s → 3y_1s
-        ('프로그래밍언어', '컴퓨터그래픽스', 0.5),# 전체 2y_2s → 3y_1s
-        ('프로그래밍언어', '데이터과학', 0.5), # 전체 2y_2s → 3y_1s
-        ('컴퓨터네트워크', '데이터과학', 0.5),# 전체 2y_2s → 3y_1s
-
-        # ===== 연도 단위 데이터 (직전학기에 없는 경우만 보조자료로 추가) =====
-        ('자료구조', '인공지능', 0.6),       # 본전공/전체 1학년→2학년
-        ('자료구조', '컴퓨터구조', 0.6),     # 본전공/전체 1학년→2학년
-        ('기계학습', '딥러닝', 0.75),        # 본전공/전체 2학년→3학년
-        ('기계학습', '데이터베이스', 0.75),  # 본전공/전체 2학년→3학년
-        ('이산수학', '운영체제', 0.68),      # 본전공/전체 2학년→3학년
-        ('공학수학', '신호및시스템', 0.75),  # 본전공/전체 3학년→4학년
-        ('기계학습', '자연어처리', 0.75),    # 본전공/전체 3학년→4학년
-        ('컴파일러', '자연어처리', 0.75),    # 본전공/이중전공 3학년→4학년
-        ('딥러닝', '자연어처리', 0.667),     # 이중전공 3학년→4학년
-        ('컴퓨터구조', '딥러닝', 0.556),     # 이중전공 3학년→4학년
-    ]
-    for prereq, next_course, coeff in prerequisites:
-        if prereq in taken:  # taken: 사용자 수강 이력
-            candidates.loc[candidates['Course_Name'] == next_course, 'cos_sim'] *= (1 + coeff * 0.1)
-            # coeff 값을 바로 쓰는 게 아니라 10% 정도 수준으로 축소된 형태로 사용하여, 선수관계가 과하게 영향을 미치지 않고 자연스럽게 소폭만 추천에 영향을 주도록 조정
-    # ==========================================
-
-    return candidates.nlargest(N, 'cos_sim')[['Course_Code','Course_Name','cos_sim']].reset_index(drop=True)
 
 # 결과 출력
 rec = recommend(user_df_processed.iloc[0], course_df, tag_cols, semester_cols)
-print(f"\n-- 추천 Top-{len(rec)} --")    # def recommend에서 N=5과목으로 설정
+print(f"\n-- 태그 추천 Top-{len(rec)} --")    # def recommend에서 N=5과목으로 설정
 print(rec.to_string(index=False))
